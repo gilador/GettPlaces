@@ -1,6 +1,9 @@
 package gor.gettplaces.presenter;
 
+import android.content.Context;
 import android.location.Location;
+
+import com.google.android.gms.maps.model.Marker;
 
 import java.util.List;
 
@@ -12,6 +15,6 @@ import gor.gettplaces.view.IView;
 
 public interface MainPresenter<T> extends IPresenter<T> {
 
-    void getCurrentLocation();
-    void getLocations();
+    void onMapReady(Context ctx);
+    void onMarkerClick(Marker theMarker);
 }

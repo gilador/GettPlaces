@@ -1,5 +1,6 @@
 package gor.gettplaces.model;
 
+import android.content.Context;
 import android.location.Location;
 
 import java.util.List;
@@ -18,6 +19,8 @@ public interface ILocationModel {
         void onCurrentLocationLoaded(Location currentLocation);
     }
 
+    void load(Context ctx);
+    void finish();
     void onLocationsUpdate(LocationsListener locationsListener);
     void onCurrentLocationUpdate(CurrentLocationsListener currentLocationsListener);
 }

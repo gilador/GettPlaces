@@ -1,7 +1,10 @@
 package gor.gettplaces.presenter;
 
+import android.content.Context;
 import android.location.Location;
 import android.util.Log;
+
+import com.google.android.gms.maps.model.Marker;
 
 import java.util.List;
 
@@ -27,6 +30,9 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     public MainPresenterImpl(ILocationModel locationModel) {
         Log.d(TAG,"MainPresenterImpl");
         mLocationModel = locationModel;
+        mLocationModel.onCurrentLocationUpdate(this);
+        mLocationModel.onLocationsUpdate(this);
+
     }
 
     //==============================================================================================
@@ -39,20 +45,20 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
 
     @Override
     public void onPause() {
-
+        //TODO pause the model?
     }
 
     //==============================================================================================
     //                              Interface MainPresenter impl
     //==============================================================================================
     @Override
-    public void getCurrentLocation() {
-        mLocationModel.onCurrentLocationUpdate(this);
+    public void onMarkerClick(Marker theMarker){
+
     }
 
     @Override
-    public void getLocations() {
-        mLocationModel.onLocationsUpdate(this);
+    public void onMapReady(Context ctx) {
+        mLocationModel.load(ctx);
     }
 
 

@@ -1,7 +1,18 @@
 package gor.gettplaces.model;
 
+import android.Manifest;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
+import android.os.Bundle;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
 import android.util.Log;
+
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationServices;
 
 import java.util.List;
 
@@ -15,7 +26,7 @@ import io.reactivex.disposables.Disposable;
  * Created by gor on 11/05/2017.
  */
 
-public class LocationModelImpl implements ILocationModel {
+public class LocationModelImpl implements ILocationModel, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     //==============================================================================================
     //                              Constants
@@ -27,23 +38,38 @@ public class LocationModelImpl implements ILocationModel {
     //==============================================================================================
     private CurrentLocationsListener mCurrentLocationListener;
     private LocationsListener mLocationsListener;
-
-//    private Location mCurrentLocation;
-//    private List<Location> mLocationsList;
+    private GoogleApiClient mGoogleApiClient;
 
     //==============================================================================================
     //                              Constructors
     //==============================================================================================
-    public LocationModelImpl(){
-        Log.d(TAG,"LocationModelImpl - C-tor");
+    public LocationModelImpl() {
+        Log.d(TAG, "LocationModelImpl - C-tor");
 
-        CurrentLocationEvent.CURRENT_LOCATION_UPDATE.subscribe(new CurrentLocationObserver(mCurrentLocationListener));
-        CurrentLocationEvent.LOCATIONS_UPDATE.subscribe((new LocationsObserver(mLocationsListener)));
+
     }
 
     //==============================================================================================
     //                              Interface  ILocationModel impl
     //==============================================================================================
+    @Override
+    public void load(Context ctx) {
+        CurrentLocationEvent.CURRENT_LOCATION_UPDATE.subscribe(new CurrentLocationObserver(mCurrentLocationListener));
+        CurrentLocationEvent.LOCATIONS_UPDATE.subscribe((new LocationsObserver(mLocationsListener)));
+
+        LocationManager locationManager = (LocationManager) ctx.getSystemService(Context.LOCATION_SERVICE);
+
+        askForLastKnownLocation(ctx);
+        mGoogleApiClient.connect();
+//        Location location = getLastKnonw
+//        CurrentLocationEvent.CURRENT_LOCATION_UPDATE.onNext(location);
+    }
+
+    @Override
+    public void finish() {
+        mGoogleApiClient.disconnect();
+    }
+
     @Override
     public void onLocationsUpdate(LocationsListener locationsListener) {
         Log.d(TAG,"onLocationsUpdate");
@@ -75,6 +101,7 @@ public class LocationModelImpl implements ILocationModel {
         @Override
         public void onNext(@NonNull Object location) {
             Log.d(TAG,"OnNext");
+
             mCurrentLocationListener.onCurrentLocationLoaded((Location) location);
         }
 
@@ -123,6 +150,46 @@ public class LocationModelImpl implements ILocationModel {
         public void onComplete() {
             Log.d(TAG,"OnComplete");
 
+        }
+    }
+
+    //==============================================================================================
+    //                              interface ConnectionCallbacks impl
+    //==============================================================================================
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Log.d(TAG,"onConnected - last location available");
+        Location lastLocation = LocationServices.FusedLocationApi.getLastLocation(
+                mGoogleApiClient);
+        if (lastLocation != null) {
+            CurrentLocationEvent.CURRENT_LOCATION_UPDATE.onNext(lastLocation);
+        }
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.d(TAG,"onConnectionSuspended");
+
+    }
+
+    @Override
+    public void onConnectionFailed(@android.support.annotation.NonNull ConnectionResult connectionResult) {
+        Log.d(TAG,"onConnectionFailed");
+
+    }
+
+    //==============================================================================================
+    //                              Private
+    //==============================================================================================
+    private void askForLastKnownLocation(Context ctx) {
+// Create an instance of GoogleAPIClient.
+        if (mGoogleApiClient == null) {
+            mGoogleApiClient = new GoogleApiClient.Builder(ctx)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .addApi(LocationServices.API)
+                    .build();
         }
     }
 }

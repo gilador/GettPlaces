@@ -40,6 +40,7 @@ dependencies {
     })
     testCompile 'junit:junit:4.12'
 
+
     compile "com.android.support:appcompat-v7:$SUPPORT_LIB"
     compile "com.android.support:recyclerview-v7:$SUPPORT_LIB"
 
@@ -57,4 +58,9 @@ dependencies {
     compile "com.google.dagger:dagger-android:$DAGGER"
     annotationProcessor "com.google.dagger:dagger-android-processor:$DAGGER"
     compile "com.google.dagger:dagger-android-support:$DAGGER"
+
+    compile 'com.google.android.gms:play-services-maps:10.2.4'
+    compile 'com.google.android.gms:play-services-location:10.2.4'
+
+
 }
