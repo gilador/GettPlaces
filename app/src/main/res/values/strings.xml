@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">GettPlaces</string>
+    <string name="GOOGLE_MAPS_API_KEY">AIzaSyAfBQjKiAFLodt4rb_d-QVcU-zMLw0Zc5Y</string>
+</resources>
