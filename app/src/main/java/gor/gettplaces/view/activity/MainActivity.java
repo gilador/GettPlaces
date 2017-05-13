@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.widget.Toast;
 
@@ -21,6 +22,7 @@ import javax.inject.Inject;
 
 import gor.gettplaces.GettPlacesApplication;
 import gor.gettplaces.R;
+import gor.gettplaces.Utils;
 import gor.gettplaces.presenter.IPresenter;
 import gor.gettplaces.presenter.MainPresenter;
 import gor.gettplaces.service.CurrentLocationService;
@@ -29,11 +31,17 @@ import gor.gettplaces.view.MainView;
 
 public class MainActivity extends BaseDaggerActivity implements MainView, OnMapReadyCallback {
 
-    private static final int FINE_LOCATION = 17;
-    private static final int CORASE_LOCATION = 18;
+    private static final int FINE_LOCATION_CODE = 17;
+    private static final int CORASE_LOCATION_CODE = 18;
     @Inject
     protected MainPresenter mPresenter;
     private GoogleMap mMap;
+    private SupportMapFragment mMapFragment;
+    private boolean mMapInit;
+
+    //=============================================================================================
+    //                               AppCompatActivity Impl
+    //=============================================================================================
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,53 +49,90 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
         init();
     }
 
-    private void init() {
-        setContentView(R.layout.activity_main);
-
-        ((GettPlacesApplication) getApplication()).getComponent().inject(this);
-
-        startService(new Intent(this, CurrentLocationService.class));
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    FINE_LOCATION);
-        }
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                    CORASE_LOCATION);
-        }
-
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(this);
-
+    @Override
+    protected void onStart() {
+        super.onStart();
+        syncMap();
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
+        if (requestCode == CORASE_LOCATION_CODE || requestCode == FINE_LOCATION_CODE){
+            syncMap();
+
+        }
+    }
+
+    //=============================================================================================
+    //                               Abstract BaseDaggerActivity Impl
+    //=============================================================================================
+    @Override
     IPresenter<IView> getPresenter() {
         return mPresenter;
     }
 
+    //=============================================================================================
+    //                               Interface MainView Impl
+    //=============================================================================================
     @Override
     public void setLocations(List<Location> locationslist) {
 
     }
 
     @Override
-    public void setCurrentLocation(Location currentLocation) {
+    public void setStartLocation(Location currentLocation) {
         LatLng current = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
         mMap.addMarker(new MarkerOptions().position(current)
                 .title("->You Are Here<-"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(current));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 12.0f));
+
     }
 
+    //=============================================================================================
+    //                               Interface OnMapReadyCallback Impl
+    //=============================================================================================
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        Toast.makeText(this,"HI",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "HI", Toast.LENGTH_SHORT).show();
         mPresenter.onMapReady(this);
         mMap = googleMap;
+    }
+
+    //=============================================================================================
+    //                               Private
+    //=============================================================================================
+    private void init() {
+        setContentView(R.layout.activity_main);
+
+        ((GettPlacesApplication) getApplication()).getComponent().inject(this);
+
+        checkPermissions();
+
+        mMapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.map);
+    }
+
+    private void checkPermissions() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    FINE_LOCATION_CODE);
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                    CORASE_LOCATION_CODE);
+        }
+    }
+
+    private void syncMap() {
+        if (Utils.isLocationPermissionGranted(this) && !mMapInit) {
+            mMapInit = true;
+            mMapFragment.getMapAsync(this);
+        }
     }
 }

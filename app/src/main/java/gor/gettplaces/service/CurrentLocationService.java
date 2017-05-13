@@ -25,7 +25,7 @@ public class CurrentLocationService extends Service implements LocationListener 
     private static final long MIN_TIME_BW_UPDATES = 10;
     private static final float MIN_DISTANCE_CHANGE_FOR_UPDATES = 10;
     private static final String TAG = CurrentLocationService.class.getSimpleName();
-    private final CurrentLocationEvent mLatestLocation = CurrentLocationEvent.CURRENT_LOCATION_UPDATE;
+    private final CurrentLocationEvent mLatestLocation = CurrentLocationEvent.START_LOCATION_UPDATE;
 
     //=============================================================================================
     //                               Privates
@@ -88,7 +88,7 @@ public class CurrentLocationService extends Service implements LocationListener 
     @Override
     public void onLocationChanged(Location location) {
         Log.d(TAG,"onLocationChanged");
-        mLatestLocation.CURRENT_LOCATION_UPDATE.onNext(location);
+        mLatestLocation.START_LOCATION_UPDATE.onNext(location);
     }
 
     @Override

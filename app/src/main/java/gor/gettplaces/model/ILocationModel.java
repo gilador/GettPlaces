@@ -15,12 +15,14 @@ public interface ILocationModel {
         void onLocationsLoaded(List<Location> locationList);
     }
 
-    interface CurrentLocationsListener {
-        void onCurrentLocationLoaded(Location currentLocation);
+    interface StartLocationsListener {
+        void onStartLocationLoaded(Location currentLocation);
     }
 
     void load(Context ctx);
     void finish();
-    void onLocationsUpdate(LocationsListener locationsListener);
-    void onCurrentLocationUpdate(CurrentLocationsListener currentLocationsListener);
+    void setAutoUpdateCurrentLocation();
+    void setManualLocation(String address);
+    void setOnLocationsUpdate(LocationsListener locationsListener);
+    void setOnStartLocationUpdate(StartLocationsListener startLocationsListener);
 }

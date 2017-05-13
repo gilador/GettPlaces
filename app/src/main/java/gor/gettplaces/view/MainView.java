@@ -10,5 +10,5 @@ import java.util.List;
 
 public interface MainView {
     void setLocations(List<Location> locationslist);
-    void setCurrentLocation(Location currentLocation);
+    void setStartLocation(Location currentLocation);
 }

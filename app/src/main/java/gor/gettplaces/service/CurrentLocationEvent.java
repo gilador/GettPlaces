@@ -12,7 +12,7 @@ import io.reactivex.subjects.PublishSubject;
  */
 
 public enum CurrentLocationEvent {
-    CURRENT_LOCATION_UPDATE(PublishSubject.create()),
+    START_LOCATION_UPDATE(PublishSubject.create()),
     LOCATIONS_UPDATE(PublishSubject.create());
 
     public PublishSubject<Object> event_queue;

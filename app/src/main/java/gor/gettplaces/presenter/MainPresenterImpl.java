@@ -15,7 +15,7 @@ import gor.gettplaces.view.MainView;
  * Created by gor on 10/05/2017.
  */
 
-public class MainPresenterImpl implements MainPresenter<MainView>, ILocationModel.LocationsListener, ILocationModel.CurrentLocationsListener {
+public class MainPresenterImpl implements MainPresenter<MainView>, ILocationModel.LocationsListener, ILocationModel.StartLocationsListener {
 
     private static final String TAG = MainPresenterImpl.class.getSimpleName();
     //==============================================================================================
@@ -30,8 +30,8 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     public MainPresenterImpl(ILocationModel locationModel) {
         Log.d(TAG,"MainPresenterImpl");
         mLocationModel = locationModel;
-        mLocationModel.onCurrentLocationUpdate(this);
-        mLocationModel.onLocationsUpdate(this);
+        mLocationModel.setOnStartLocationUpdate(this);
+        mLocationModel.setOnLocationsUpdate(this);
 
     }
 
@@ -45,7 +45,7 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
 
     @Override
     public void onPause() {
-        //TODO pause the model?
+        mLocationModel.finish();
     }
 
     //==============================================================================================
@@ -71,10 +71,10 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     }
 
     //==============================================================================================
-    //                              Interface ILocationModel.CurrentLocationsListener impl
+    //                              Interface ILocationModel.StartLocationsListener impl
     //==============================================================================================
     @Override
-    public void onCurrentLocationLoaded(Location currentLocation) {
-        mView.setCurrentLocation(currentLocation);
+    public void onStartLocationLoaded(Location currentLocation) {
+        mView.setStartLocation(currentLocation);
     }
 }
