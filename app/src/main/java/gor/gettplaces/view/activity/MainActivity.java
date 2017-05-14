@@ -71,7 +71,7 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == CORASE_LOCATION_CODE || requestCode == FINE_LOCATION_CODE){
+        if (requestCode == CORASE_LOCATION_CODE || requestCode == FINE_LOCATION_CODE) {
             syncMap();
 
         }
@@ -90,7 +90,13 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
     //=============================================================================================
     @Override
     public void setLocations(List<Result> locationslist) {
-        Log.d(TAG,"setLocations, size:" + locationslist.size());
+        Log.d(TAG, "setLocations, size:" + locationslist.size());
+        for (Result result : locationslist) {
+            if (result != null && result.getGeometry() != null & result.getGeometry().getLocation() != null) {
+                mMap.addMarker(new MarkerOptions().position(Utils.convertGeoToLocation(result.getGeometry()))
+                        .title("->You Are Here<-"));
+            }
+        }
     }
 
     @Override
@@ -99,7 +105,7 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
         mMap.addMarker(new MarkerOptions().position(current)
                 .title("->You Are Here<-"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(current));
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 12.0f));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 15.0f));
 
     }
 

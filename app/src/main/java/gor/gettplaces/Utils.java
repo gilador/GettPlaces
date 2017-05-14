@@ -3,7 +3,12 @@ package gor.gettplaces;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+
+import com.google.android.gms.maps.model.LatLng;
+
+import gor.gettplaces.network.pojo.Geometry;
 
 /**
  * Created by gor on 10/05/2017.
@@ -16,5 +21,10 @@ public class Utils {
             return false;
         }
         return true;
+    }
+
+    public static LatLng convertGeoToLocation(@NonNull Geometry geometry) {
+        LatLng location = new LatLng(geometry.getLocation().getLat(),geometry.getLocation().getLng());
+        return location;
     }
 }
