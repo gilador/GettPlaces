@@ -10,14 +10,21 @@ import android.util.Log;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.model.LatLng;
 
 import java.util.List;
 
 import gor.gettplaces.R;
-import gor.gettplaces.network.pojo.NearBySearchResponse;
-import gor.gettplaces.network.pojo.Result;
+import gor.gettplaces.Utils;
+import gor.gettplaces.bus.AddressEventBus;
+import gor.gettplaces.bus.LocationEventBus;
+import gor.gettplaces.network.pojo.address.AddressLookUpResponse;
+import gor.gettplaces.network.pojo.address.Prediction;
+import gor.gettplaces.network.pojo.geoLocation.GeoLocationRespone;
+import gor.gettplaces.network.pojo.geoLocation.Geometry;
+import gor.gettplaces.network.pojo.places.NearBySearchResponse;
+import gor.gettplaces.network.pojo.places.Result;
 import gor.gettplaces.network.service.PlacesService;
-import gor.gettplaces.service.CurrentLocationEvent;
 import gor.gettplaces.service.CurrentLocationService;
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -26,8 +33,6 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
-import okhttp3.OkHttpClient;
-import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -43,10 +48,13 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
     //                              Constants
     //==============================================================================================
     private static final String TAG = LocationModelImpl.class.getSimpleName();
+    private final PlacesService mService;
 
     //==============================================================================================
     //                              Privates
     //==============================================================================================
+    private AddressLookUpCompleteListener mAddressLookUpCompleteListener;
+    private GeocodingCompleteListener mGeocodingCompleteListener;
     private StartLocationsListener mStartLocationListener;
     private LocationsListener mLocationsListener;
     private GoogleApiClient mGoogleApiClient;
@@ -57,7 +65,12 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
     //==============================================================================================
     public LocationModelImpl() {
         Log.d(TAG, "LocationModelImpl - C-tor");
-
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(PlacesService.SERVICE_ENDPOINT)
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+        mService = retrofit.create(PlacesService.class);
 
     }
 
@@ -65,13 +78,15 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
     //                              Interface  ILocationModel impl
     //==============================================================================================
     @Override
-    public void load(Context ctx) {
-        Log.d(TAG, "load");
+    public void init(Context ctx) {
+        Log.d(TAG, "init");
         mContext = ctx;
-        CurrentLocationEvent.START_LOCATION_UPDATE.subscribe(new CurrentLocationObserver(mStartLocationListener));
-        CurrentLocationEvent.LOCATIONS_UPDATE.subscribe((new LocationsObserver(mLocationsListener)));
+        LocationEventBus.START_LOCATION_UPDATE.subscribe(new CurrentLocationObserver(mStartLocationListener));
+        LocationEventBus.LOCATIONS_UPDATE.subscribe((new LocationsObserver(mLocationsListener)));
+        LocationEventBus.GEOCODING_UPDATE.subscribe((new GeocodingObserver(mGeocodingCompleteListener)));
+        AddressEventBus.ADDRESS_LOOKUP_UPDATE.subscribe((new AddressLookupObserver(mAddressLookUpCompleteListener)));
         askForLastKnownLocation(ctx);
-        setAutoUpdateCurrentLocation();
+        loadAutoUpdateCurrentLocation();
         mGoogleApiClient.connect();
     }
 
@@ -84,40 +99,97 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
     }
 
     @Override
-    //Default setup - look at "load()"
-    public void setAutoUpdateCurrentLocation() {
+    //Default setup - look at "init()"
+    public void loadAutoUpdateCurrentLocation() {
+        publishLastKnownLocation();
         mContext.startService(new Intent(mContext, CurrentLocationService.class));
     }
 
     @Override
-    public void setManualLocation(String address) {
+    public void loadManualLocation(Geometry geometry) {
         mContext.stopService(new Intent(mContext, CurrentLocationService.class));
-        //TODO get address position
+        publishStartLocation(Utils.convertGeoToLocation(geometry));
     }
 
     @Override
-    public void setOnLocationsUpdate(LocationsListener locationsListener) {
-        Log.d(TAG, "setOnLocationsUpdate");
+    public void loadSurroundingLocations(LatLng location) {
+        getNearByPlaces(location);
+    }
+
+    @Override
+    public void translateAddressToGeo(String address) {
+        String apiKey = mContext.getString(R.string.GOOGLE_MAPS_API_KEY);
+        mService.getGeo(apiKey, address)
+                .doOnError(new Consumer<Throwable>() {
+                    @Override
+                    public void accept(@NonNull Throwable throwable) throws Exception {
+                        Log.e(TAG, throwable.getMessage());
+                    }
+                })
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Function<GeoLocationRespone, Geometry>() {
+                    @Override
+                    public Geometry apply(@NonNull GeoLocationRespone geoLocationRespone) throws Exception {
+                        return geoLocationRespone.getResults().get(0).getGeometry();
+                    }
+                })
+                .subscribe(new GeocodingObserver(mGeocodingCompleteListener));
+    }
+
+    @Override
+    public void lookForAddress(String addressPrefix) {
+        String apiKey = mContext.getString(R.string.GOOGLE_MAPS_API_KEY);
+        mService.getAddress(apiKey, addressPrefix)
+                .doOnError(new Consumer<Throwable>() {
+                    @Override
+                    public void accept(@NonNull Throwable throwable) throws Exception {
+                        Log.e(TAG, throwable.getMessage());
+                    }
+                })
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Function<AddressLookUpResponse, List<Prediction>>() {
+                    @Override
+                    public List<Prediction> apply(@NonNull AddressLookUpResponse addressLookUpResponse) throws Exception {
+                        return addressLookUpResponse.getPredictions();
+                    }
+                })
+                .subscribe(new AddressLookupObserver(mAddressLookUpCompleteListener));
+    }
+
+    @Override
+    public void setOnLocationsUpdateListener(LocationsListener locationsListener) {
+        Log.d(TAG, "setOnLocationsUpdateListener");
         mLocationsListener = locationsListener;
     }
 
     @Override
-    public void setOnStartLocationUpdate(StartLocationsListener listener) {
-        Log.d(TAG, "setOnStartLocationUpdate");
+    public void setOnStartLocationUpdateListener(StartLocationsListener listener) {
+        Log.d(TAG, "setOnStartLocationUpdateListener");
         mStartLocationListener = listener;
     }
 
+    @Override
+    public void setOnAddressLookUpCompleteListener(AddressLookUpCompleteListener onAddressLookUpCompleteListener) {
+        Log.d(TAG, "setOnAddressLookUpCompleteListener");
+        mAddressLookUpCompleteListener = onAddressLookUpCompleteListener;
+
+    }
+
+    @Override
+    public void setGeocodingCompleteListener(GeocodingCompleteListener geocodingCompleteListener) {
+        Log.d(TAG, "setGeocodingCompleteListener");
+        mGeocodingCompleteListener = geocodingCompleteListener;
+    }
+
     //==============================================================================================
-    //                              Interface  ConnectionCallbacks impl
+    //                              Interface  GoogleApiClient.ConnectionCallbacks impl
     //==============================================================================================
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.d(TAG, "onConnected - last location available");
-        Location lastLocation = LocationServices.FusedLocationApi.getLastLocation(
-                mGoogleApiClient);
-        if (lastLocation != null) {
-            publishStartLocation(lastLocation);
-        }
+        publishLastKnownLocation();
     }
 
     @Override
@@ -145,23 +217,10 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
         }
     }
 
-    private void publishStartLocation(Location location) {
-        CurrentLocationEvent.START_LOCATION_UPDATE.onNext(location);
-        getNearByPlaces(location);
-    }
-
-    private void getNearByPlaces(Location location) {
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(PlacesService.SERVICE_ENDPOINT)
-                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
-                .addConverterFactory(GsonConverterFactory.create())
-                .build();
-
-        PlacesService service = retrofit.create(PlacesService.class);
-
+    private void getNearByPlaces(LatLng location) {
         String apiKey = mContext.getString(R.string.GOOGLE_MAPS_API_KEY);
-        String latLng = location.getLatitude() + "," + location.getLongitude();
-        service.getNearByPlaces(apiKey, latLng, PlacesService.DEFAULT_RADIUS)
+        String latLng = location.latitude + "," + location.longitude;
+        mService.getNearByPlaces(apiKey, latLng, PlacesService.DEFAULT_RADIUS)
                 .doOnError(new Consumer<Throwable>() {
                     @Override
                     public void accept(@NonNull Throwable throwable) throws Exception {
@@ -179,10 +238,35 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
                 .subscribe(new LocationsObserver(mLocationsListener));
     }
 
+    private void publishStartLocation(LatLng location) {
+        if(location != Utils.convertGeoToLocation(getLastKnownLocation())) {
+            LocationEventBus.START_LOCATION_UPDATE.onNext(location);
+        }
+    }
+
+    private void publishLastKnownLocation() {
+        Location lastLocation = getLastKnownLocation();
+
+        if (lastLocation != null) {
+            publishStartLocation(Utils.convertGeoToLocation(lastLocation));
+        }
+    }
+
+    @Nullable
+    private Location getLastKnownLocation() {
+        Location lastLocation = null;
+
+        if (mGoogleApiClient.isConnected()) {
+            lastLocation = LocationServices.FusedLocationApi.getLastLocation(
+                    mGoogleApiClient);
+        }
+        return lastLocation;
+    }
+
     //==============================================================================================
     //                              Private Class CurrentLocationObserver
     //==============================================================================================
-    private static class CurrentLocationObserver implements Observer<Location> {
+    private static class CurrentLocationObserver implements Observer<LatLng> {
 
         private StartLocationsListener mCurrentLocationListener;
 
@@ -197,8 +281,8 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
         }
 
         @Override
-        public void onNext(@NonNull Location location) {
-            Log.d(TAG, "CurrentLocationObserver: OnNext, location: " + location.getLatitude()+","+location.getLongitude());
+        public void onNext(@NonNull LatLng location) {
+            Log.d(TAG, "CurrentLocationObserver: OnNext, location: " + location.latitude + "," + location.longitude);
 
             mCurrentLocationListener.onStartLocationLoaded(location);
         }
@@ -252,5 +336,77 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
 
         }
 
+    }
+
+    //==============================================================================================
+    //                              Private Class AddressLookupObserver
+    //==============================================================================================
+    private static class AddressLookupObserver implements Observer<List<Prediction>> {
+
+        private AddressLookUpCompleteListener mAddressLookUpCompleteListener;
+
+        AddressLookupObserver(AddressLookUpCompleteListener addressLookUpCompleteListener) {
+            mAddressLookUpCompleteListener = addressLookUpCompleteListener;
+        }
+
+        @Override
+        public void onSubscribe(@NonNull Disposable d) {
+            Log.d(TAG, "AddressLookUpCompleteListener: onSubscribe");
+
+        }
+
+        @Override
+        public void onNext(@NonNull List<Prediction> addresses) {
+            Log.d(TAG, "AddressLookUpCompleteListener: OnNext");
+            mAddressLookUpCompleteListener.onAddressLookComplete(addresses);
+        }
+
+        @Override
+        public void onError(@NonNull Throwable e) {
+            Log.d(TAG, "AddressLookUpCompleteListener: onError" + e);
+
+        }
+
+        @Override
+        public void onComplete() {
+            Log.d(TAG, "AddressLookUpCompleteListener: OnComplete");
+
+        }
+    }
+
+    //==============================================================================================
+    //                              Private Class AddressLookupObserver
+    //==============================================================================================
+    private static class GeocodingObserver implements Observer<Geometry> {
+
+        private GeocodingCompleteListener mGeocodingCompleteListener;
+
+        GeocodingObserver(GeocodingCompleteListener geocodingCompleteListener) {
+            mGeocodingCompleteListener = geocodingCompleteListener;
+        }
+
+        @Override
+        public void onSubscribe(@NonNull Disposable d) {
+            Log.d(TAG, "GeocodingObserver: onSubscribe");
+
+        }
+
+        @Override
+        public void onNext(@NonNull Geometry geometry) {
+            Log.d(TAG, "GeocodingObserver: OnNext");
+            mGeocodingCompleteListener.onGeocodingComplete(geometry);
+        }
+
+        @Override
+        public void onError(@NonNull Throwable e) {
+            Log.d(TAG, "GeocodingObserver: onError" + e);
+
+        }
+
+        @Override
+        public void onComplete() {
+            Log.d(TAG, "GeocodingObserver: OnComplete");
+
+        }
     }
 }

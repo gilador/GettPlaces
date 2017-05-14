@@ -2,17 +2,28 @@ package gor.gettplaces.view.activity;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
@@ -23,13 +34,16 @@ import javax.inject.Inject;
 import gor.gettplaces.GettPlacesApplication;
 import gor.gettplaces.R;
 import gor.gettplaces.Utils;
-import gor.gettplaces.network.pojo.Result;
+import gor.gettplaces.network.pojo.address.Prediction;
+import gor.gettplaces.network.pojo.places.Result;
 import gor.gettplaces.presenter.IPresenter;
 import gor.gettplaces.presenter.MainPresenter;
 import gor.gettplaces.view.IView;
 import gor.gettplaces.view.MainView;
+import gor.gettplaces.view.adapter.AddressSuggestionAdapter;
+import gor.gettplaces.view.animation.WidthExpandAnimation;
 
-public class MainActivity extends BaseDaggerActivity implements MainView, OnMapReadyCallback {
+public class MainActivity extends BaseDaggerActivity implements MainView, OnMapReadyCallback, AddressSuggestionAdapter.SuggestionClickListener {
 
     //=============================================================================================
     //                               Constants members
@@ -41,6 +55,11 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
     //=============================================================================================
     //                               Protected Members
     //=============================================================================================
+    private AddressSuggestionAdapter mAddressSuggestionAdapter;
+
+    //=============================================================================================
+    //                               Protected Members
+    //=============================================================================================
     @Inject
     protected MainPresenter mPresenter;
 
@@ -48,8 +67,13 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
     //                               Private Members
     //=============================================================================================
     private SupportMapFragment mMapFragment;
+    private EditText mSearch;
+    private EditText mFocusThief;
     private boolean mMapInit;
     private GoogleMap mMap;
+    private RecyclerView mSuggestionsList;
+    private ImageView mGpsButton;
+    private View mMagnifyingGlass;
 
     //=============================================================================================
     //                               AppCompatActivity Impl
@@ -77,6 +101,17 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
         }
     }
 
+    @Override
+    public void onBackPressed() {
+        if (!mSearch.getText().toString().equals("")) {
+            mSearch.setText("");
+            mGpsButton.requestFocus();
+            this.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
     //=============================================================================================
     //                               Abstract BaseDaggerActivity Impl
     //=============================================================================================
@@ -89,24 +124,36 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
     //                               Interface MainView Impl
     //=============================================================================================
     @Override
-    public void setLocations(List<Result> locationslist) {
-        Log.d(TAG, "setLocations, size:" + locationslist.size());
+    public void onLocationsUpdate(List<Result> locationslist) {
+        Log.d(TAG, "onLocationsUpdate, size:" + locationslist.size());
         for (Result result : locationslist) {
             if (result != null && result.getGeometry() != null & result.getGeometry().getLocation() != null) {
                 mMap.addMarker(new MarkerOptions().position(Utils.convertGeoToLocation(result.getGeometry()))
-                        .title("->You Are Here<-"));
+                        .title(result.getName()));
             }
         }
     }
 
     @Override
-    public void setStartLocation(Location currentLocation) {
-        LatLng current = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
-        mMap.addMarker(new MarkerOptions().position(current)
-                .title("->You Are Here<-"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(current));
+    public void onStartLocationUpdate(LatLng currentLocation) {
+        LatLng current = new LatLng(currentLocation.latitude, currentLocation.longitude);
+        mMap.clear();
+        mMap.addMarker(new MarkerOptions()
+                .position(current)
+                .title("->You Are Here<-")
+                .icon(BitmapDescriptorFactory.fromResource(R.mipmap.home_pin)));
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, 15.0f));
 
+    }
+
+    @Override
+    public void onAddressLookupComplete(List<Prediction> suggestions) {
+        mAddressSuggestionAdapter.setData(suggestions);
+    }
+
+    @Override
+    public void closeSearchDialog() {
+        mSearch.setText("");
     }
 
     //=============================================================================================
@@ -117,6 +164,15 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
         Toast.makeText(this, "HI", Toast.LENGTH_SHORT).show();
         mPresenter.onMapReady(this);
         mMap = googleMap;
+    }
+
+    //=============================================================================================
+    //                                SuggestionClickListener Impl
+    //=============================================================================================
+
+    @Override
+    public void OnSuggestionClick(Prediction predictionSuggestion) {
+        mPresenter.onSuggestionֻSelected(predictionSuggestion);
     }
 
     //=============================================================================================
@@ -131,6 +187,86 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
 
         mMapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
+        mGpsButton = (ImageView) findViewById(R.id.gps_button);
+        mAddressSuggestionAdapter = new AddressSuggestionAdapter(this, this);
+        mSearch = (EditText) findViewById(R.id.address_search);
+        mFocusThief = (EditText) findViewById(R.id.focus_thief);
+        mMagnifyingGlass = findViewById(R.id.magnifying_glass);
+        mSuggestionsList = (RecyclerView) findViewById(R.id.suggestion_list);
+        mSuggestionsList.setAdapter(mAddressSuggestionAdapter);
+        mSuggestionsList.setLayoutManager(new LinearLayoutManager(this));
+        mSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+                mPresenter.onSearchForAddress(editable.toString());
+            }
+        });
+        mGpsButton.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View view, boolean b) {
+                mPresenter.onGpsButtonClick();
+            }
+        });
+        mSearch.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View view, boolean b) {
+                int expandWidth = (int) (getResources().getDimension(R.dimen.address_suggestion_width));
+                final float toAlpha = mSearch.getLayoutParams().width == expandWidth ? 1 : 0;
+                final float fromAlpha = mSearch.getLayoutParams().width == expandWidth ? 0 : 1;
+                if (mSearch.getLayoutParams().width == expandWidth) {
+
+                    expandWidth = (int) (getResources().getDimension(R.dimen.address_suggestion_width_collapse));
+                }
+                WidthExpandAnimation anim = new WidthExpandAnimation(mSearch, expandWidth);
+                anim.setDuration(400);
+                anim.setAnimationListener(new Animation.AnimationListener() {
+                    @Override
+                    public void onAnimationStart(Animation animation) {
+                        AlphaAnimation anim = new AlphaAnimation(fromAlpha, toAlpha);
+                        anim.setDuration(400);
+                        anim.setAnimationListener(new Animation.AnimationListener() {
+                            @Override
+                            public void onAnimationStart(Animation animation) {
+
+                            }
+
+                            @Override
+                            public void onAnimationEnd(Animation animation) {
+                                mMagnifyingGlass.setAlpha(toAlpha);
+                            }
+
+                            @Override
+                            public void onAnimationRepeat(Animation animation) {
+
+                            }
+                        });
+                        mMagnifyingGlass.startAnimation(anim);
+
+                        if(toAlpha == 1) mSearch.setHint(null);
+
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animation animation) {
+                        if(toAlpha == 0) mSearch.setHint(R.string.address_lookup);
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(Animation animation) {
+
+                    }
+                });
+                mSearch.startAnimation(anim);
+            }
+        });
     }
 
     private void checkPermissions() {

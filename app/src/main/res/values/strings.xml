@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">GettPlaces</string>
     <string name="GOOGLE_MAPS_API_KEY">AIzaSyAszlCnuj9J0pq9umJSl7ANHOIBJkF9l4w</string>
+    <string name="address_lookup">address lookup</string>
 </resources>

@@ -1,29 +1,18 @@
 
-package gor.gettplaces.network.pojo;
+package gor.gettplaces.network.pojo.geoLocation;
 
 import java.util.List;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-public class NearBySearchResponse {
+public class GeoLocationRespone {
 
-    @SerializedName("html_attributions")
-    @Expose
-    private List<Object> htmlAttributions = null;
     @SerializedName("results")
     @Expose
     private List<Result> results = null;
     @SerializedName("status")
     @Expose
     private String status;
-
-    public List<Object> getHtmlAttributions() {
-        return htmlAttributions;
-    }
-
-    public void setHtmlAttributions(List<Object> htmlAttributions) {
-        this.htmlAttributions = htmlAttributions;
-    }
 
     public List<Result> getResults() {
         return results;

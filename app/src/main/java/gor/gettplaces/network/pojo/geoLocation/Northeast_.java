@@ -1,10 +1,10 @@
 
-package gor.gettplaces.network.pojo;
+package gor.gettplaces.network.pojo.geoLocation;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-public class Northeast {
+public class Northeast_ {
 
     @SerializedName("lat")
     @Expose

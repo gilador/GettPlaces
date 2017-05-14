@@ -1,6 +1,4 @@
-package gor.gettplaces.service;
-
-import android.location.Location;
+package gor.gettplaces.bus;
 
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -11,13 +9,17 @@ import io.reactivex.subjects.PublishSubject;
  * Created by gor on 12/05/2017.
  */
 
-public enum CurrentLocationEvent {
-    START_LOCATION_UPDATE(PublishSubject.create()),
-    LOCATIONS_UPDATE(PublishSubject.create());
+/**
+ * This enum behaves as event bus .
+ * ADDRESS_LOOKUP_UPDATE will deliver events regarding address lookup.
+ */
+
+public enum AddressEventBus {
+    ADDRESS_LOOKUP_UPDATE(PublishSubject.create());
 
     public PublishSubject<Object> event_queue;
 
-    CurrentLocationEvent(PublishSubject<Object> objectPublishSubject) {
+    AddressEventBus(PublishSubject<Object> objectPublishSubject) {
         event_queue = objectPublishSubject;
         event_queue.subscribeOn(Schedulers.io());
         event_queue.observeOn(AndroidSchedulers.mainThread());
@@ -27,7 +29,7 @@ public enum CurrentLocationEvent {
         event_queue.subscribe(observer);
     }
 
-    public void onNext(Location currentLocation) {
-        event_queue.onNext(currentLocation);
+    public void onNext(String address) {
+        event_queue.onNext(address);
     }
 }

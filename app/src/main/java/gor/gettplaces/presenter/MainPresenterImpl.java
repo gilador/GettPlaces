@@ -1,22 +1,24 @@
 package gor.gettplaces.presenter;
 
 import android.content.Context;
-import android.location.Location;
 import android.util.Log;
 
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 
 import java.util.List;
 
 import gor.gettplaces.model.ILocationModel;
-import gor.gettplaces.network.pojo.Result;
+import gor.gettplaces.network.pojo.address.Prediction;
+import gor.gettplaces.network.pojo.geoLocation.Geometry;
+import gor.gettplaces.network.pojo.places.Result;
 import gor.gettplaces.view.MainView;
 
 /**
  * Created by gor on 10/05/2017.
  */
 
-public class MainPresenterImpl implements MainPresenter<MainView>, ILocationModel.LocationsListener, ILocationModel.StartLocationsListener {
+public class MainPresenterImpl implements MainPresenter<MainView>{
 
     private static final String TAG = MainPresenterImpl.class.getSimpleName();
     //==============================================================================================
@@ -31,8 +33,10 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     public MainPresenterImpl(ILocationModel locationModel) {
         Log.d(TAG,"MainPresenterImpl");
         mLocationModel = locationModel;
-        mLocationModel.setOnStartLocationUpdate(this);
-        mLocationModel.setOnLocationsUpdate(this);
+        mLocationModel.setOnStartLocationUpdateListener(this);
+        mLocationModel.setOnLocationsUpdateListener(this);
+        mLocationModel.setOnAddressLookUpCompleteListener(this);
+        mLocationModel.setGeocodingCompleteListener(this);
 
     }
 
@@ -58,8 +62,25 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     }
 
     @Override
+    public void onSearchForAddress(String address) {
+        mLocationModel.lookForAddress(address);
+        //Todo show spinner
+    }
+
+    @Override
+    public void onSuggestionֻSelected(Prediction predictionSuggestion) {
+        mView.closeSearchDialog();
+        mLocationModel.translateAddressToGeo(predictionSuggestion.getDescription());
+    }
+
+    @Override
     public void onMapReady(Context ctx) {
-        mLocationModel.load(ctx);
+        mLocationModel.init(ctx);
+    }
+
+    @Override
+    public void onGpsButtonClick() {
+        mLocationModel.loadAutoUpdateCurrentLocation();
     }
 
 
@@ -68,14 +89,31 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     //==============================================================================================
     @Override
     public void onLocationsLoaded(List<Result> locationList) {
-        mView.setLocations(locationList);
+        mView.onLocationsUpdate(locationList);
     }
 
     //==============================================================================================
     //                              Interface ILocationModel.StartLocationsListener impl
     //==============================================================================================
     @Override
-    public void onStartLocationLoaded(Location currentLocation) {
-        mView.setStartLocation(currentLocation);
+    public void onStartLocationLoaded(LatLng startLocation) {
+        mView.onStartLocationUpdate(startLocation);
+        mLocationModel.loadSurroundingLocations(startLocation);
+    }
+
+    //==============================================================================================
+    //                              Interface ILocationModel.AddressLookUpCompleteListener impl
+    //==============================================================================================
+    @Override
+    public void onAddressLookComplete(List<Prediction> suggestions) {
+        mView.onAddressLookupComplete(suggestions);
+    }
+
+    //==============================================================================================
+    //                              Interface ILocationModel. GeocodingCompleteListener impl
+    //==============================================================================================
+    @Override
+    public void onGeocodingComplete(Geometry geometry) {
+        mLocationModel.loadManualLocation(geometry);
     }
 }

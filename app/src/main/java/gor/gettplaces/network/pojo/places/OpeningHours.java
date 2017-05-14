@@ -1,5 +1,5 @@
 
-package gor.gettplaces.network.pojo;
+package gor.gettplaces.network.pojo.places;
 
 import java.util.List;
 import com.google.gson.annotations.Expose;
