@@ -5,6 +5,8 @@ import android.location.Location;
 
 import java.util.List;
 
+import gor.gettplaces.network.pojo.Result;
+
 /**
  * Created by gor on 10/05/2017.
  */
@@ -12,7 +14,7 @@ import java.util.List;
 public interface ILocationModel {
 
     interface LocationsListener {
-        void onLocationsLoaded(List<Location> locationList);
+        void onLocationsLoaded(List<Result> locationList);
     }
 
     interface StartLocationsListener {

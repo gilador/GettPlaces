@@ -1,12 +1,12 @@
 package gor.gettplaces.view.activity;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -23,21 +23,33 @@ import javax.inject.Inject;
 import gor.gettplaces.GettPlacesApplication;
 import gor.gettplaces.R;
 import gor.gettplaces.Utils;
+import gor.gettplaces.network.pojo.Result;
 import gor.gettplaces.presenter.IPresenter;
 import gor.gettplaces.presenter.MainPresenter;
-import gor.gettplaces.service.CurrentLocationService;
 import gor.gettplaces.view.IView;
 import gor.gettplaces.view.MainView;
 
 public class MainActivity extends BaseDaggerActivity implements MainView, OnMapReadyCallback {
 
+    //=============================================================================================
+    //                               Constants members
+    //=============================================================================================
     private static final int FINE_LOCATION_CODE = 17;
     private static final int CORASE_LOCATION_CODE = 18;
+    private static final String TAG = MainActivity.class.getSimpleName();
+
+    //=============================================================================================
+    //                               Protected Members
+    //=============================================================================================
     @Inject
     protected MainPresenter mPresenter;
-    private GoogleMap mMap;
+
+    //=============================================================================================
+    //                               Private Members
+    //=============================================================================================
     private SupportMapFragment mMapFragment;
     private boolean mMapInit;
+    private GoogleMap mMap;
 
     //=============================================================================================
     //                               AppCompatActivity Impl
@@ -77,8 +89,8 @@ public class MainActivity extends BaseDaggerActivity implements MainView, OnMapR
     //                               Interface MainView Impl
     //=============================================================================================
     @Override
-    public void setLocations(List<Location> locationslist) {
-
+    public void setLocations(List<Result> locationslist) {
+        Log.d(TAG,"setLocations, size:" + locationslist.size());
     }
 
     @Override

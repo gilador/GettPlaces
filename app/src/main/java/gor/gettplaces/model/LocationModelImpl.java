@@ -13,11 +13,24 @@ import com.google.android.gms.location.LocationServices;
 
 import java.util.List;
 
+import gor.gettplaces.R;
+import gor.gettplaces.network.pojo.NearBySearchResponse;
+import gor.gettplaces.network.pojo.Result;
+import gor.gettplaces.network.service.PlacesService;
 import gor.gettplaces.service.CurrentLocationEvent;
 import gor.gettplaces.service.CurrentLocationService;
 import io.reactivex.Observer;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 
 /**
@@ -138,13 +151,38 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
     }
 
     private void getNearByPlaces(Location location) {
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(PlacesService.SERVICE_ENDPOINT)
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
 
+        PlacesService service = retrofit.create(PlacesService.class);
+
+        String apiKey = mContext.getString(R.string.GOOGLE_MAPS_API_KEY);
+        String latLng = location.getLatitude() + "," + location.getLongitude();
+        service.getNearByPlaces(apiKey, latLng, PlacesService.DEFAULT_RADIUS)
+                .doOnError(new Consumer<Throwable>() {
+                    @Override
+                    public void accept(@NonNull Throwable throwable) throws Exception {
+                        Log.e(TAG, throwable.getMessage());
+                    }
+                })
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Function<NearBySearchResponse, List<Result>>() {
+                    @Override
+                    public List<Result> apply(@NonNull NearBySearchResponse nearBySearchResponse) throws Exception {
+                        return nearBySearchResponse.getResults();
+                    }
+                })
+                .subscribe(new LocationsObserver(mLocationsListener));
     }
 
     //==============================================================================================
     //                              Private Class CurrentLocationObserver
     //==============================================================================================
-    private static class CurrentLocationObserver implements Observer {
+    private static class CurrentLocationObserver implements Observer<Location> {
 
         private StartLocationsListener mCurrentLocationListener;
 
@@ -159,10 +197,10 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
         }
 
         @Override
-        public void onNext(@NonNull Object location) {
-            Log.d(TAG, "CurrentLocationObserver: OnNext");
+        public void onNext(@NonNull Location location) {
+            Log.d(TAG, "CurrentLocationObserver: OnNext, location: " + location.getLatitude()+","+location.getLongitude());
 
-            mCurrentLocationListener.onStartLocationLoaded((Location) location);
+            mCurrentLocationListener.onStartLocationLoaded(location);
         }
 
         @Override
@@ -182,7 +220,7 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
     //==============================================================================================
     //                              Private Class LocationsObserver
     //==============================================================================================
-    private static class LocationsObserver implements Observer {
+    private static class LocationsObserver implements Observer<List<Result>> {
 
         private LocationsListener mLocationsListener;
 
@@ -197,14 +235,14 @@ public class LocationModelImpl implements ILocationModel, GoogleApiClient.Connec
         }
 
         @Override
-        public void onNext(@NonNull Object locations) {
+        public void onNext(@NonNull List<Result> locations) {
             Log.d(TAG, "LocationsObserver: OnNext");
-            mLocationsListener.onLocationsLoaded((List<Location>) locations);
+            mLocationsListener.onLocationsLoaded(locations);
         }
 
         @Override
         public void onError(@NonNull Throwable e) {
-            Log.d(TAG, "LocationsObserver: onError");
+            Log.d(TAG, "LocationsObserver: onError" + e);
 
         }
 

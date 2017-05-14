@@ -9,6 +9,7 @@ import com.google.android.gms.maps.model.Marker;
 import java.util.List;
 
 import gor.gettplaces.model.ILocationModel;
+import gor.gettplaces.network.pojo.Result;
 import gor.gettplaces.view.MainView;
 
 /**
@@ -66,7 +67,7 @@ public class MainPresenterImpl implements MainPresenter<MainView>, ILocationMode
     //                              Interface ILocationModel.LocationsListener impl
     //==============================================================================================
     @Override
-    public void onLocationsLoaded(List<Location> locationList) {
+    public void onLocationsLoaded(List<Result> locationList) {
         mView.setLocations(locationList);
     }
 
